@@ -1,5 +1,5 @@
-from requests import Request, Session
-from aiogram import Bot, Dispatcher, types, executor
+from requests import Session
+from aiogram import Bot, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram import Dispatcher, types
 from aiogram.dispatcher import FSMContext
@@ -43,7 +43,7 @@ class User:
 
     def createUserRecord(self):
         inserted_id = None
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1\db.db')
+        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1db.db')
         cursor = conn.cursor()
         cursor.execute('create table if not exists users (telegram_id INTEGER primary key)')
         cursor.execute('insert into users (telegram_id) values (?)', (self.telegram_id,))
@@ -53,7 +53,7 @@ class User:
         return inserted_id
 
     def checkPortfolio(self):
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1\db.db')
+        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1\\db.db')
         cursor = conn.cursor()
         cursor.execute('''create table if not exists portfolio (
                           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,7 +80,7 @@ class Asset:
 
     def addCurrency(self):
         inserted_id = None
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1\db.db')
+        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1\\db.db')
         cursor = conn.cursor()
         cursor.execute('''create table if not exists portfolio (
                           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,7 +127,6 @@ def getAssetPrice(data, asset_name):
         if data[i].get('symbol') == asset_name:
             asset_price = round(data[i].get('quote').get('USD').get('price'), 2)
             return asset_price
-
 
 
 @dp.message_handler(commands=['start'])
@@ -227,16 +226,16 @@ async def add_command(message: types.Message, state: FSMContext):
         await state.finish()
 
 
-@dp.message_handler(commands=['checkPortfolio']) #сделать запрос, распарсить для каждой монеты
+@dp.message_handler(commands=['checkPortfolio'])  # сделать запрос, распарсить для каждой монеты
 async def add_command(message: types.Message):
     user = User(message.from_user.id)
     data = user.checkPortfolio()
     sum = 0
     for row in data:
         sum += float(row[1]) * float(row[2])
-    text = f"Ваш портфель: {round(sum,2)} USD\n"
+    text = f"Ваш портфель: {round(sum, 2)} USD\n"
     for row in data:
-        text += f"{row[2]} {row[3]} на сумму {round(float(row[1]) * float(row[2]),2)}, средняя {row[0]} \n"
+        text += f"{row[2]} {row[3]} на сумму {round(float(row[1]) * float(row[2]), 2)}, средняя {row[0]} \n"
     await bot.send_message(message.chat.id, text)
 
 
