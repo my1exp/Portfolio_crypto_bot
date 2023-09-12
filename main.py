@@ -27,6 +27,7 @@ class AssetStates(StatesGroup):
     asset_check_name = State()
     asset_add_currency = State()
     asset_supply = State()
+    asset_price = State()
 
 
 class User:
@@ -70,6 +71,18 @@ class User:
         result = cursor.fetchall()
         return result
 
+    def lastAddedAsset(self):
+        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1\\db.db')
+        cursor = conn.cursor()
+        cursor.execute('''select ticker, price, supply, r_telegram_id
+                                from(
+                                select *, row_number() over (order by id desc) as r_w
+                                from portfolio
+                                where r_telegram_id = ?)
+                                where r_w = 1''',
+                       (self.telegram_id,))
+        result = cursor.fetchall()
+        return result
 
 class Asset:
     def __init__(self, ticker, price, supply, telegram_id) -> None:
@@ -129,6 +142,36 @@ def getAssetPrice(data, asset_name):
             return asset_price
 
 
+def actualPortfolioPrice(data):
+    asset_list = []
+    for row in data:
+        asset_list.append(row[3])
+
+    asset_prices = []
+    actual_data = checkConnection()
+    for asset in asset_list:
+        asset_prices.append(getAssetPrice(actual_data, asset))
+    return asset_prices
+
+
+def checkPortfoliotext(data, actual_asset_prices):
+    actual_sum = 0
+    buy_sum = []
+    for i in range(len(data)):
+        actual_sum += data[i][2] * actual_asset_prices[i]
+        buy_sum.append(data[i][2] * data[i][0])
+
+    text = (f"Ваш портфель: {round(actual_sum, 2)} USD" +
+            f" / {round((actual_sum - sum(buy_sum)) / sum(buy_sum), 2)}% \n")
+
+    for i in range(len(data)):
+        text += (
+                f"{round(data[i][2], 2)} {data[i][3]} на сумму {round(float(data[i][2]) * actual_asset_prices[i], 2)} USD / " +
+                f"{round((float(data[i][2]) * actual_asset_prices[i] - float(data[i][0]) * float(data[i][2])) / (float(data[i][0]) * float(data[i][2])), 2)}" +
+                f"%\n")
+    return text
+
+
 @dp.message_handler(commands=['start'])
 async def start_command(message: types.Message):
     user = User(message.from_user.id)
@@ -182,7 +225,7 @@ async def add_command(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=AssetStates.asset_add_currency)
 async def add_command(message: types.Message, state: FSMContext):
-    await state.update_data(chosen_asset=message.text.upper())  # {'chosen_asset': 'BTC'}
+    await state.update_data(chosen_asset=message.text.upper())
     asset_name = message.text.upper()
     data = checkConnection()
     asset_index = checkAssetExistance(asset_name, data)
@@ -203,21 +246,41 @@ async def add_command(message: types.Message, state: FSMContext):
 async def add_command(message: types.Message, state: FSMContext):
     try:
         await state.update_data(chosen_supply=float(message.text))
+        await bot.send_message(message.chat.id, 'Введите стоимость покупки актива за 1 единицу \n'
+                                                'В случае, если вы хотите добавить актив по текущей стоимости - '
+                                                'введите 0')
+        await state.set_state(AssetStates.asset_price.state)
+    except ValueError:
+        await bot.send_message(message.chat.id, 'Введите количество актива числом. Пример  = "1.01"\n'
+                                                '/addCurrency попробуйте снова')
+        await state.finish()
+
+
+@dp.message_handler(state=AssetStates.asset_price)
+async def add_command(message: types.Message, state: FSMContext):
+    try:
+        await state.update_data(chosen_price=float(message.text))
         user_asset = await state.get_data()
-        print(user_asset.get('inf')[user_asset.get('index')].get('quote').get('USD').get('price'))
-        asset_price = round(user_asset.get('inf')[user_asset.get('index')].get('quote').get('USD').get('price'), 2)
-        asset = Asset(user_asset.get('chosen_asset'), asset_price,
-                      user_asset.get('chosen_supply'), message.from_user.id)
-        asset.addCurrency()
+        if user_asset.get('chosen_asset') == 0:
+            asset_price = round(user_asset.get('inf')[user_asset.get('index')].get('quote').get('USD').get('price'), 2)
+            asset = Asset(user_asset.get('chosen_asset'), asset_price,
+                          user_asset.get('chosen_supply'), message.from_user.id)
+            asset.addCurrency()
+        else:
+            asset_price = user_asset.get('chosen_price')
+            asset = Asset(user_asset.get('chosen_asset'), asset_price,
+                          user_asset.get('chosen_supply'), message.from_user.id)
+            asset.addCurrency()
+
+        user = User(message.from_user.id)
+        added_asset = user.lastAddedAsset()
         await bot.send_message(message.chat.id,
-                               'Вы добавили ' + str(user_asset.get('chosen_supply')) + ' ' + str(
-                                   user_asset.get('chosen_asset'))
-                               + ' на общую стоимость ' + str(
-                                   round(float(user_asset.get('chosen_supply')) * asset_price, 2))
+                               'Вы добавили ' + str(added_asset[0][2]) + ' ' + str(added_asset[0][0])
+                               + ' на общую стоимость ' + str(added_asset[0][2] * added_asset[0][1])
                                + ' USD в портфель! \n'
                                  'Выберите /checkPortfolio чтобы посмотреть свой текущий портфель\n'
                                  'Выберите /addCurrency чтобы добавить еще один актив в портфель')
-        # await state.finish()
+        await state.finish()
     except ValueError:
         await bot.send_message(message.chat.id, 'Введите количество актива числом. Пример  = "1.01"\n'
                                                 '/addCurrency попробуйте снова')
@@ -226,16 +289,12 @@ async def add_command(message: types.Message, state: FSMContext):
         await state.finish()
 
 
-@dp.message_handler(commands=['checkPortfolio'])  # сделать запрос, распарсить для каждой монеты
+@dp.message_handler(commands=['checkPortfolio'])
 async def add_command(message: types.Message):
     user = User(message.from_user.id)
     data = user.checkPortfolio()
-    sum = 0
-    for row in data:
-        sum += float(row[1]) * float(row[2])
-    text = f"Ваш портфель: {round(sum, 2)} USD\n"
-    for row in data:
-        text += f"{row[2]} {row[3]} на сумму {round(float(row[1]) * float(row[2]), 2)}, средняя {row[0]} \n"
+    actual_asset_prices = actualPortfolioPrice(data)
+    text = checkPortfoliotext(data, actual_asset_prices)
     await bot.send_message(message.chat.id, text)
 
 
