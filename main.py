@@ -7,7 +7,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 import sqlite3
 import json
 
-bot = Bot(token="...")
+bot = Bot(token="..")
 
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -19,7 +19,7 @@ parameters = {
 }
 headers = {
     'Accepts': 'application/json',
-    'X-CMC_PRO_API_KEY': '...',
+    'X-CMC_PRO_API_KEY': '..',
 }
 
 
