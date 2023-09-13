@@ -239,7 +239,7 @@ async def add_command(message: types.Message, state: FSMContext):
                                '/addCurrency')
         await state.finish()
     elif asset_index is None:
-        await bot.send_message(message.chat.id, 'Не удалось найти указанный тикер актива, попробуйте снова'
+        await bot.send_message(message.chat.id, 'Не удалось найти указанный тикер актива, попробуйте снова\n'
                                                 '/addCurrency')
         await state.finish()
     else:
@@ -258,7 +258,7 @@ async def add_command(message: types.Message, state: FSMContext):
                                                 'введите 0')
         await state.set_state(AssetStates.asset_price.state)
     except ValueError:
-        await bot.send_message(message.chat.id, 'Введите количество актива числом. Пример  = "1.01"\n'
+        await bot.send_message(message.chat.id, 'Введите количество актива числом. Пример  = "1.01" \n'
                                                 '/addCurrency попробуйте снова')
         await state.finish()
 
@@ -268,7 +268,7 @@ async def add_command(message: types.Message, state: FSMContext):
     try:
         await state.update_data(chosen_price=float(message.text))
         user_asset = await state.get_data()
-        if user_asset.get('chosen_asset') == 0:
+        if user_asset.get('chosen_price') == 0:
             asset_price = round(user_asset.get('inf')[user_asset.get('index')].get('quote').get('USD').get('price'), 2)
             asset = Asset(user_asset.get('chosen_asset'), asset_price,
                           user_asset.get('chosen_supply'), message.from_user.id)
@@ -300,9 +300,12 @@ async def add_command(message: types.Message, state: FSMContext):
 async def add_command(message: types.Message):
     user = User(message.from_user.id)
     data = user.check_portfolio()
-    actual_asset_prices = actual_portfolio_price(data)
-    text = check_portfolio_text(data, actual_asset_prices)
-    await bot.send_message(message.chat.id, text)
+    if len(data) == 0:
+        await bot.send_message(message.chat.id, 'Ваш портфель пуст!')
+    else:
+        actual_asset_prices = actual_portfolio_price(data)
+        text = check_portfolio_text(data, actual_asset_prices)
+        await bot.send_message(message.chat.id, text)
 
 
 if __name__ == '__main__':
