@@ -7,7 +7,8 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 import sqlite3
 import json
 
-bot = Bot(token="..")
+
+bot = Bot(token='')
 
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -19,7 +20,7 @@ parameters = {
 }
 headers = {
     'Accepts': 'application/json',
-    'X-CMC_PRO_API_KEY': '..',
+    'X-CMC_PRO_API_KEY': '',
 }
 
 
@@ -35,7 +36,7 @@ class User:
         self.telegram_id = telegram_id
 
     def check_user_record(self):
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1\db.db')
+        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db')
         cursor = conn.cursor()
         cursor.execute('create table if not exists users (telegram_id INTEGER primary key)')
         cursor.execute('select * from users where telegram_id = ?', (self.telegram_id,))
@@ -44,7 +45,7 @@ class User:
 
     def create_user_record(self):
         inserted_id = None
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1db.db')
+        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db')
         cursor = conn.cursor()
         cursor.execute('create table if not exists users (telegram_id INTEGER primary key)')
         cursor.execute('insert into users (telegram_id) values (?)', (self.telegram_id,))
@@ -54,7 +55,7 @@ class User:
         return inserted_id
 
     def check_portfolio(self):
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1\\db.db')
+        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db')
         cursor = conn.cursor()
         cursor.execute('''create table if not exists portfolio (
                           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,7 +73,7 @@ class User:
         return result
 
     def last_added_asset(self):
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1\\db.db')
+        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db')
         cursor = conn.cursor()
         cursor.execute('''select ticker, price, supply, r_telegram_id
                                 from(
@@ -94,7 +95,7 @@ class Asset:
 
     def add_currency(self):
         inserted_id = None
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\bot_test_1\\db.db')
+        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db')
         cursor = conn.cursor()
         cursor.execute('''create table if not exists portfolio (
                           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -207,10 +208,12 @@ async def check_command(message: types.Message, state: FSMContext):
     asset_name = message.text.upper()
     data = check_connection()
     if data is None:
-        await bot.send_message(message.chat.id, 'Не удалось сделать запрос, попробуйте снова')
+        await bot.send_message(message.chat.id, 'Не удалось сделать запрос, попробуйте снова\n'
+                                                '/checkCurrency')
         await state.finish()
     elif check_asset_existance(asset_name, data) is None:
-        await bot.send_message(message.chat.id, 'Не удалось найти указанный тикер актива, попробуйте снова')
+        await bot.send_message(message.chat.id, 'Не удалось найти указанный тикер актива, попробуйте снова \n'
+                               '/checkCurrency')
         await state.finish()
     else:
         await bot.send_message(message.chat.id,
@@ -232,10 +235,12 @@ async def add_command(message: types.Message, state: FSMContext):
     data = check_connection()
     asset_index = check_asset_existance(asset_name, data)
     if data is None:
-        await bot.send_message(message.chat.id, 'Не удалось сделать запрос, попробуйте снова')
+        await bot.send_message(message.chat.id, 'Не удалось сделать запрос, попробуйте снова\n'
+                               '/addCurrency')
         await state.finish()
     elif asset_index is None:
-        await bot.send_message(message.chat.id, 'Не удалось найти указанный тикер актива, попробуйте снова')
+        await bot.send_message(message.chat.id, 'Не удалось найти указанный тикер актива, попробуйте снова'
+                                                '/addCurrency')
         await state.finish()
     else:
         await bot.send_message(message.chat.id, 'Введите количество актива')
