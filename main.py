@@ -8,7 +8,7 @@ import sqlite3
 import json
 
 
-bot = Bot(token='')
+bot = Bot(token='6634602106:AAFfXFv-euy1IoWWj3eBNB7VGmW_Jce8asM')
 
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -20,13 +20,16 @@ parameters = {
 }
 headers = {
     'Accepts': 'application/json',
-    'X-CMC_PRO_API_KEY': '',
+    'X-CMC_PRO_API_KEY': '7e11e445-d09a-474d-86c4-bdfd20f3b094',
 }
+
+db_path = 'C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db'
 
 
 class AssetStates(StatesGroup):
     asset_check_name = State()
     asset_add_currency = State()
+    asset_delete_currency = State()
     asset_supply = State()
     asset_price = State()
 
@@ -36,16 +39,16 @@ class User:
         self.telegram_id = telegram_id
 
     def check_user_record(self):
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute('create table if not exists users (telegram_id INTEGER primary key)')
-        cursor.execute('select * from users where telegram_id = ?', (self.telegram_id,))
+        cursor.execute('select telegram_id from users where telegram_id = ?', (self.telegram_id,))
         result = cursor.fetchone()
-        return result
+        return result[0]
 
     def create_user_record(self):
         inserted_id = None
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute('create table if not exists users (telegram_id INTEGER primary key)')
         cursor.execute('insert into users (telegram_id) values (?)', (self.telegram_id,))
@@ -55,7 +58,7 @@ class User:
         return inserted_id
 
     def check_portfolio(self):
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute('''create table if not exists portfolio (
                           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,10 +73,11 @@ class User:
                                group by ticker''',
                        (self.telegram_id,))
         result = cursor.fetchall()
+        conn.close()
         return result
 
     def last_added_asset(self):
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute('''select ticker, price, supply, r_telegram_id
                                 from(
@@ -83,7 +87,30 @@ class User:
                                 where r_w = 1''',
                        (self.telegram_id,))
         result = cursor.fetchall()
+        conn.close()
         return result
+
+    def check_asset_in_portfolio(self, asset_name):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('''select *
+                                from portfolio
+                                where r_telegram_id = ?
+                                and ticker = ?''',
+                       (self.telegram_id, asset_name))
+        result = cursor.fetchall()
+        conn.close()
+        return result
+
+    def delete_asset_from_portfolio(self, asset_name):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('''delete from portfolio
+                                where r_telegram_id = ?
+                                and ticker = ?''',
+                       (self.telegram_id, asset_name))
+        conn.commit()
+        conn.close()
 
 
 class Asset:
@@ -95,7 +122,7 @@ class Asset:
 
     def add_currency(self):
         inserted_id = None
-        conn = sqlite3.connect('C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db')
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute('''create table if not exists portfolio (
                           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -163,13 +190,13 @@ def check_portfolio_text(data, actual_asset_prices):
         actual_sum += data[i][2] * actual_asset_prices[i]
         buy_sum.append(data[i][2] * data[i][0])
 
-    text = (f"Ваш портфель: {round(actual_sum, 2)} USD" +
+    text = (f"Ваш портфель: {round(actual_sum, 2)} $" +
             f" / {round((actual_sum - sum(buy_sum)) / sum(buy_sum), 2)}% \n")
 
     for i in range(len(data)):
         text += (
                 f"{round(data[i][2], 2)} {data[i][3]} на сумму {round(float(data[i][2]) * actual_asset_prices[i], 2)} "
-                "USD / " + f'''{round((float(data[i][2]) * actual_asset_prices[i] - float(data[i][0]) *
+                "$ / " + f'''{round((float(data[i][2]) * actual_asset_prices[i] - float(data[i][0]) *
                                        float(data[i][2])) / (float(data[i][0]) * float(data[i][2])), 2)}''' + f"%\n")
     return text
 
@@ -218,7 +245,7 @@ async def check_command(message: types.Message, state: FSMContext):
     else:
         await bot.send_message(message.chat.id,
                                "Стоимость актива " + asset_name + " - " + str(
-                                   get_asset_price(data, asset_name)) + " USD")
+                                   get_asset_price(data, asset_name)) + " $")
         await state.finish()
 
 
@@ -253,8 +280,8 @@ async def add_command(message: types.Message, state: FSMContext):
 async def add_command(message: types.Message, state: FSMContext):
     try:
         await state.update_data(chosen_supply=float(message.text))
-        await bot.send_message(message.chat.id, 'Введите стоимость покупки актива за 1 единицу \n'
-                                                'В случае, если вы хотите добавить актив по текущей стоимости - '
+        await bot.send_message(message.chat.id, 'Введите стоимость покупки актива за 1 единицу в $\n'
+                                                'Добавить актив по текущей стоимости - '
                                                 'введите 0')
         await state.set_state(AssetStates.asset_price.state)
     except ValueError:
@@ -284,9 +311,10 @@ async def add_command(message: types.Message, state: FSMContext):
         await bot.send_message(message.chat.id,
                                'Вы добавили ' + str(added_asset[0][2]) + ' ' + str(added_asset[0][0])
                                + ' на общую стоимость ' + str(added_asset[0][2] * added_asset[0][1])
-                               + ' USD в портфель! \n'
-                                 'Выберите /checkPortfolio чтобы посмотреть свой текущий портфель\n'
-                                 'Выберите /addCurrency чтобы добавить еще один актив в портфель')
+                               + ' $ в портфель! \n'
+                                 '/checkPortfolio посмотреть свой текущий портфель\n'
+                                 '/addCurrency добавить еще один актив в портфель\n'
+                                 '/deleteCurrency удалить актив из портфеля')
         await state.finish()
     except ValueError:
         await bot.send_message(message.chat.id, 'Введите количество актива числом. Пример  = "1.01"\n'
@@ -301,12 +329,41 @@ async def add_command(message: types.Message):
     user = User(message.from_user.id)
     data = user.check_portfolio()
     if len(data) == 0:
-        await bot.send_message(message.chat.id, 'Ваш портфель пуст!')
+        await bot.send_message(message.chat.id, 'Ваш портфель пуст!\n'
+                                                '/addCurrency добавить новый актив')
     else:
         actual_asset_prices = actual_portfolio_price(data)
         text = check_portfolio_text(data, actual_asset_prices)
         await bot.send_message(message.chat.id, text)
 
+
+@dp.message_handler(commands=['deleteCurrency'])
+async def check_command(message: types.Message, state: FSMContext):
+    await bot.send_message(message.chat.id, 'Введите идентификатор актива')
+    await state.set_state(AssetStates.asset_delete_currency.state)
+
+
+@dp.message_handler(state=AssetStates.asset_delete_currency)
+async def check_command(message: types.Message, state: FSMContext):
+    user = User(message.from_user.id)
+    data = user.check_portfolio()
+    if len(data) == 0:
+        await bot.send_message(message.chat.id, 'Ваш портфель пуст!\n'
+                                                '/addCurrency добавить новый актив')
+        await state.finish()
+    else:
+        await state.update_data(chosen_asset=message.text.upper())
+        asset = await state.get_data()
+        data = user.check_asset_in_portfolio(asset.get('chosen_asset'))
+        if len(data) == 0:
+            await bot.send_message(message.chat.id, f"Актива {asset.get('chosen_asset')} в вашем портфеле нет!\n"
+                                                    f"/checkPortfolio")
+            await state.finish()
+        else:
+            user.delete_asset_from_portfolio(asset.get('chosen_asset'))
+            await bot.send_message(message.chat.id, f"Актив {asset.get('chosen_asset')} удален из вашего портфеля!\n"
+                                                    f"/checkPortfolio")
+            await state.finish()
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
