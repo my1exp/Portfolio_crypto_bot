@@ -8,7 +8,8 @@ import sqlite3
 import json
 
 
-bot = Bot(token='6634602106:AAFfXFv-euy1IoWWj3eBNB7VGmW_Jce8asM')
+bot = Bot(token='')
+db_path = 'C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db'
 
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -20,10 +21,8 @@ parameters = {
 }
 headers = {
     'Accepts': 'application/json',
-    'X-CMC_PRO_API_KEY': '7e11e445-d09a-474d-86c4-bdfd20f3b094',
+    'X-CMC_PRO_API_KEY': '',
 }
-
-db_path = 'C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db'
 
 
 class AssetStates(StatesGroup):
@@ -86,19 +85,19 @@ class User:
                                 where r_telegram_id = ?)
                                 where r_w = 1''',
                        (self.telegram_id,))
-        result = cursor.fetchall()
+        result = cursor.fetchone()
         conn.close()
         return result
 
     def check_asset_in_portfolio(self, asset_name):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute('''select *
+        cursor.execute('''select ticker
                                 from portfolio
                                 where r_telegram_id = ?
                                 and ticker = ?''',
                        (self.telegram_id, asset_name))
-        result = cursor.fetchall()
+        result = cursor.fetchone()
         conn.close()
         return result
 
@@ -120,7 +119,7 @@ class Asset:
         self.supply = supply
         self.r_telegram_id = telegram_id
 
-    def add_currency(self):
+    def add_asset(self):
         inserted_id = None
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -153,7 +152,7 @@ def check_connection():
         return None
 
 
-def check_asset_existance(asset_name, data):
+def check_asset_existence(asset_name, data):
     b = []
     for i in range(len(data)):
         if data[i].get('symbol') == asset_name:
@@ -238,7 +237,7 @@ async def check_command(message: types.Message, state: FSMContext):
         await bot.send_message(message.chat.id, 'Не удалось сделать запрос, попробуйте снова\n'
                                                 '/checkCurrency')
         await state.finish()
-    elif check_asset_existance(asset_name, data) is None:
+    elif check_asset_existence(asset_name, data) is None:
         await bot.send_message(message.chat.id, 'Не удалось найти указанный тикер актива, попробуйте снова \n'
                                '/checkCurrency')
         await state.finish()
@@ -260,7 +259,7 @@ async def add_command(message: types.Message, state: FSMContext):
     await state.update_data(chosen_asset=message.text.upper())
     asset_name = message.text.upper()
     data = check_connection()
-    asset_index = check_asset_existance(asset_name, data)
+    asset_index = check_asset_existence(asset_name, data)
     if data is None:
         await bot.send_message(message.chat.id, 'Не удалось сделать запрос, попробуйте снова\n'
                                '/addCurrency')
@@ -299,12 +298,12 @@ async def add_command(message: types.Message, state: FSMContext):
             asset_price = round(user_asset.get('inf')[user_asset.get('index')].get('quote').get('USD').get('price'), 2)
             asset = Asset(user_asset.get('chosen_asset'), asset_price,
                           user_asset.get('chosen_supply'), message.from_user.id)
-            asset.add_currency()
+            asset.add_asset()
         else:
             asset_price = user_asset.get('chosen_price')
             asset = Asset(user_asset.get('chosen_asset'), asset_price,
                           user_asset.get('chosen_supply'), message.from_user.id)
-            asset.add_currency()
+            asset.add_asset()
 
         user = User(message.from_user.id)
         added_asset = user.last_added_asset()
