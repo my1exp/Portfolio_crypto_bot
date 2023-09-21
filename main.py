@@ -8,7 +8,7 @@ import sqlite3
 import json
 
 
-bot = Bot(token='')
+bot = Bot(token='6634602106:AAFfXFv-euy1IoWWj3eBNB7VGmW_Jce8asM')
 db_path = 'C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db'
 
 storage = MemoryStorage()
@@ -21,7 +21,7 @@ parameters = {
 }
 headers = {
     'Accepts': 'application/json',
-    'X-CMC_PRO_API_KEY': '',
+    'X-CMC_PRO_API_KEY': '7e11e445-d09a-474d-86c4-bdfd20f3b094',
 }
 
 
@@ -43,7 +43,7 @@ class User:
         cursor.execute('create table if not exists users (telegram_id INTEGER primary key)')
         cursor.execute('select telegram_id from users where telegram_id = ?', (self.telegram_id,))
         result = cursor.fetchone()
-        return result[0]
+        return result
 
     def create_user_record(self):
         inserted_id = None

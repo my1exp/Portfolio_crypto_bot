@@ -41,13 +41,13 @@ class UserTests(unittest.TestCase):
     def test_user_record(self):
         user = main.User(self.test_telegram_id)
         result = user.check_user_record()
-        self.assertEqual(result, self.test_telegram_id)
+        self.assertEqual(result[0], self.test_telegram_id)
 
     def test_create_user(self):
         user = main.User(self.test_telegram_id_for_create)
         user.create_user_record()
         result = user.check_user_record()
-        self.assertEqual(result, self.test_telegram_id_for_create)
+        self.assertEqual(result[0], self.test_telegram_id_for_create)
 
     def test_check_portfolio_empty(self):
         user = main.User(self.test_telegram_id)
