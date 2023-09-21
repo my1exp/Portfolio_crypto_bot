@@ -308,8 +308,8 @@ async def add_command(message: types.Message, state: FSMContext):
         user = User(message.from_user.id)
         added_asset = user.last_added_asset()
         await bot.send_message(message.chat.id,
-                               'Вы добавили ' + str(added_asset[0][2]) + ' ' + str(added_asset[0][0])
-                               + ' на общую стоимость ' + str(added_asset[0][2] * added_asset[0][1])
+                               'Вы добавили ' + str(added_asset[2]) + ' ' + str(added_asset[0])
+                               + ' на общую стоимость ' + str(added_asset[2] * added_asset[1])
                                + ' $ в портфель! \n'
                                  '/checkPortfolio посмотреть свой текущий портфель\n'
                                  '/addCurrency добавить еще один актив в портфель\n'
@@ -346,7 +346,7 @@ async def check_command(message: types.Message, state: FSMContext):
 async def check_command(message: types.Message, state: FSMContext):
     user = User(message.from_user.id)
     data = user.check_portfolio()
-    if len(data) == 0:
+    if data is None:
         await bot.send_message(message.chat.id, 'Ваш портфель пуст!\n'
                                                 '/addCurrency добавить новый актив')
         await state.finish()
@@ -354,7 +354,7 @@ async def check_command(message: types.Message, state: FSMContext):
         await state.update_data(chosen_asset=message.text.upper())
         asset = await state.get_data()
         data = user.check_asset_in_portfolio(asset.get('chosen_asset'))
-        if len(data) == 0:
+        if data is None:
             await bot.send_message(message.chat.id, f"Актива {asset.get('chosen_asset')} в вашем портфеле нет!\n"
                                                     f"/checkPortfolio")
             await state.finish()
