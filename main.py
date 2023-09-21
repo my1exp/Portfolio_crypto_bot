@@ -8,7 +8,7 @@ import sqlite3
 import json
 
 
-bot = Bot(token='6634602106:AAFfXFv-euy1IoWWj3eBNB7VGmW_Jce8asM')
+bot = Bot(token='')
 db_path = 'C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db'
 
 storage = MemoryStorage()
@@ -21,7 +21,7 @@ parameters = {
 }
 headers = {
     'Accepts': 'application/json',
-    'X-CMC_PRO_API_KEY': '7e11e445-d09a-474d-86c4-bdfd20f3b094',
+    'X-CMC_PRO_API_KEY': '',
 }
 
 
