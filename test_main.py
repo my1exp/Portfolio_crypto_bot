@@ -3,7 +3,7 @@ import unittest
 import sqlite3
 from unittest import mock
 
-db_path = 'C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db'
+db_path = 'data\\db.db'
 
 
 class UserTests(unittest.TestCase):
