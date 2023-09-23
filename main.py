@@ -6,23 +6,17 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 import sqlite3
 import json
+import api_config
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
-bot = Bot(token='')
-db_path = 'C:\\Users\\Nikita\\IdeaProjects\\Portfolio_crypto_bot\\db.db'
+bot = Bot(os.getenv('BOT_TOKEN'))
+db_path = 'data\\db.db'
 
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
-
-parameters = {
-    'start': '1',
-    'limit': '30',
-    'convert': 'USD'
-}
-headers = {
-    'Accepts': 'application/json',
-    'X-CMC_PRO_API_KEY': '',
-}
 
 
 class AssetStates(StatesGroup):
@@ -142,8 +136,8 @@ class Asset:
 def check_connection():
     url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
     session = Session()
-    session.headers.update(headers)
-    response = session.get(url, params=parameters)
+    session.headers.update(api_config.headers)
+    response = session.get(url, params=api_config.parameters)
 
     if response.status_code == 200:
         data = json.loads(response.text).get('data')
@@ -196,7 +190,7 @@ def check_portfolio_text(data, actual_asset_prices):
         text += (
                 f"{round(data[i][2], 2)} {data[i][3]} на сумму {round(float(data[i][2]) * actual_asset_prices[i], 2)} "
                 "$ / " + f'''{round((float(data[i][2]) * actual_asset_prices[i] - float(data[i][0]) *
-                                       float(data[i][2])) / (float(data[i][0]) * float(data[i][2])), 2)}''' + f"%\n")
+                                     float(data[i][2])) / (float(data[i][0]) * float(data[i][2])), 2)}''' + f"%\n")
     return text
 
 
@@ -239,7 +233,7 @@ async def check_command(message: types.Message, state: FSMContext):
         await state.finish()
     elif check_asset_existence(asset_name, data) is None:
         await bot.send_message(message.chat.id, 'Не удалось найти указанный тикер актива, попробуйте снова \n'
-                               '/checkCurrency')
+                                                '/checkCurrency')
         await state.finish()
     else:
         await bot.send_message(message.chat.id,
@@ -262,7 +256,7 @@ async def add_command(message: types.Message, state: FSMContext):
     asset_index = check_asset_existence(asset_name, data)
     if data is None:
         await bot.send_message(message.chat.id, 'Не удалось сделать запрос, попробуйте снова\n'
-                               '/addCurrency')
+                                                '/addCurrency')
         await state.finish()
     elif asset_index is None:
         await bot.send_message(message.chat.id, 'Не удалось найти указанный тикер актива, попробуйте снова\n'
@@ -363,6 +357,7 @@ async def check_command(message: types.Message, state: FSMContext):
             await bot.send_message(message.chat.id, f"Актив {asset.get('chosen_asset')} удален из вашего портфеля!\n"
                                                     f"/checkPortfolio")
             await state.finish()
+
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
