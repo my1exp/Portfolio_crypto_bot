@@ -25,4 +25,5 @@ jobs:
     - name: Run tests
       env:
         API_TOKEN: ${{ secrets.API_TOKEN }}
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
       run: python test_main.py
