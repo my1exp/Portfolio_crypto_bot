@@ -18,6 +18,7 @@ db_path = 'app_data\\db.db'
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
+print('test deploy')
 
 class AssetStates(StatesGroup):
     asset_check_name = State()
