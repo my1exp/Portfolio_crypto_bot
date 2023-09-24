@@ -1,7 +1,7 @@
 name: Run Tests
 on:
   pull_request:
-    branches: [ main, dev ] # Здесь указывается название ветки, которую нужно выкатывать
+    branches: [ master, dev ] # Здесь указывается название ветки, которую нужно выкатывать
 
 jobs:
   test:
