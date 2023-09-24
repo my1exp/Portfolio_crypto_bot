@@ -18,7 +18,7 @@ db_path = 'app_data\\db.db'
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
-print('1213126')
+print('12113126')
 
 
 class AssetStates(StatesGroup):
