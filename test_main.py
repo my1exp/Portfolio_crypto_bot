@@ -135,10 +135,6 @@ class LogicTests(unittest.TestCase):
         asset = 'BTC'
         check = main.get_asset_price(actual_data, asset)
         self.assertIsNotNone(check)
-    #
-    # def test_all_user_added_assets_to_str(self):
-    #
-
 
 
 if __name__ == '__main__':

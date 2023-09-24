@@ -276,7 +276,7 @@ async def start_command(message: types.Message):
 
 @dp.message_handler(commands=['info'])
 async def info_command(message: types.Message):
-    await message.answer("Info: \n "
+    await message.answer("Info: \n"
                          "/checkCurrency - узнать стоимость криптоактива\n"
                          "Работа с портфелем:\n "
                          "/checkPortfolio - просмотреть текущий портфель\n"
