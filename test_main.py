@@ -64,10 +64,9 @@ class UserTests(unittest.TestCase):
         asset = main.Asset('ASD', 100, 100, self.test_telegram_id_for_portfolio_check)
         asset.add_asset()
         result = user.check_portfolio()
-        self.assertEqual(result[0][0], float(asset.price))
-        self.assertEqual(result[0][1], float(asset.price))
-        self.assertEqual(result[0][2], float(asset.supply))
-        self.assertEqual(result[0][3], asset.ticker)
+        self.assertEqual(result[0][0], float((asset.price * asset.supply)/asset.supply))
+        self.assertEqual(result[0][1], float(asset.supply))
+        self.assertEqual(result[0][2], asset.ticker)
 
     def test_last_added_asset(self):
         user = main.User(self.test_telegram_id_for_portfolio_check)
@@ -118,6 +117,28 @@ class LogicTests(unittest.TestCase):
             mock_get.return_value = mock_response_success
             result_success = main.check_connection()[0].get('symbol')
             self.assertEqual(result_success, test_response_asset_name)
+
+    def test_check_asset_existence_not_None(self):
+        asset_name = 'BTC'
+        data = main.check_connection()
+        check = main.check_asset_existence(asset_name, data)
+        self.assertEqual(check, 0)
+
+    def test_check_asset_existence_is_None(self):
+        asset_name = 'asdasdasd'
+        data = main.check_connection()
+        check = main.check_asset_existence(asset_name, data)
+        self.assertIsNone(check)
+
+    def test_get_asset_price(self):
+        actual_data = main.check_connection()
+        asset = 'BTC'
+        check = main.get_asset_price(actual_data, asset)
+        self.assertIsNotNone(check)
+    #
+    # def test_all_user_added_assets_to_str(self):
+    #
+
 
 
 if __name__ == '__main__':

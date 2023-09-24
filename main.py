@@ -25,6 +25,10 @@ class AssetStates(StatesGroup):
     asset_delete_currency = State()
     asset_supply = State()
     asset_price = State()
+    asset_id_for_edit = State()
+    user_action_for_edit = State()
+    user_value_for_edit = State()
+    user_value_for_delete = State()
 
 
 class User:
@@ -61,9 +65,10 @@ class User:
                           r_telegram_id INTEGER,
                           FOREIGN KEY(r_telegram_id) REFERENCES users(telegram_id)
                           )''')
-        cursor.execute('''select round(avg(price),4), sum(price), sum(supply), ticker
+        cursor.execute('''select sum(price * supply)/ sum(supply) as avg_, sum(supply) as supply, ticker
                                from portfolio where r_telegram_id = ?
-                               group by ticker''',
+                               group by ticker
+                               order by sum(price) * sum(supply) desc''',
                        (self.telegram_id,))
         result = cursor.fetchall()
         conn.close()
@@ -102,6 +107,61 @@ class User:
                                 where r_telegram_id = ?
                                 and ticker = ?''',
                        (self.telegram_id, asset_name))
+        conn.commit()
+        conn.close()
+
+    def check_all_user_assets(self):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('''create table if not exists portfolio (
+                          id INTEGER PRIMARY KEY AUTOINCREMENT,
+                          ticker TEXT,
+                          price REAL,
+                          supply real,
+                          r_telegram_id INTEGER,
+                          FOREIGN KEY(r_telegram_id) REFERENCES users(telegram_id)
+                          )''')
+        cursor.execute('''select row_number() over (order by id), ticker, price, supply, id
+                                from portfolio
+                                where r_telegram_id = ?
+                                ''',
+                       (self.telegram_id,))
+        result = cursor.fetchall()
+        conn.close()
+        return result
+
+    def update_supply_chosen_asset(self, chosen_row, chosen_value):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('''update portfolio
+                                set supply = ?
+                                where id = ?
+                                and r_telegram_id = ?
+                                ''',
+                       (chosen_value, chosen_row, self.telegram_id,))
+        conn.commit()
+        conn.close()
+
+    def update_price_chosen_asset(self, chosen_row, chosen_value):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('''update portfolio
+                                set price = ?
+                                where id = ?
+                                and r_telegram_id = ?
+                                ''',
+                       (chosen_value, chosen_row, self.telegram_id,))
+        conn.commit()
+        conn.close()
+
+    def delete_row_chosen_asset(self, chosen_row):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('''delete from portfolio
+                                where id = ?
+                                and r_telegram_id = ?
+                                ''',
+                       (chosen_row, self.telegram_id,))
         conn.commit()
         conn.close()
 
@@ -167,7 +227,7 @@ def get_asset_price(data, asset_name):
 def actual_portfolio_price(data):
     asset_list = []
     for row in data:
-        asset_list.append(row[3])
+        asset_list.append(row[2])
 
     asset_prices = []
     actual_data = check_connection()
@@ -180,17 +240,28 @@ def check_portfolio_text(data, actual_asset_prices):
     actual_sum = 0
     buy_sum = []
     for i in range(len(data)):
-        actual_sum += data[i][2] * actual_asset_prices[i]
-        buy_sum.append(data[i][2] * data[i][0])
-
+        actual_sum += data[i][1] * actual_asset_prices[i]
+        buy_sum.append(data[i][1] * data[i][0])
     text = (f"Ваш портфель: {round(actual_sum, 2)} $" +
-            f" / {round((actual_sum - sum(buy_sum)) / sum(buy_sum), 2)}% \n")
-
+            f" / {round(((actual_sum - sum(buy_sum)) / sum(buy_sum))*100, 2)}% \n")
     for i in range(len(data)):
+        actual_sum_asset = data[i][1] * actual_asset_prices[i]
+        buy_sum_asset = data[i][1] * data[i][0]
         text += (
-                f"{round(data[i][2], 2)} {data[i][3]} на сумму {round(float(data[i][2]) * actual_asset_prices[i], 2)} "
-                "$ / " + f'''{round((float(data[i][2]) * actual_asset_prices[i] - float(data[i][0]) *
-                                     float(data[i][2])) / (float(data[i][0]) * float(data[i][2])), 2)}''' + f"%\n")
+                f"{round(data[i][1], 2)} {data[i][2]} на сумму {round(actual_sum_asset)} "
+                "USD / " + f"{round(((actual_sum_asset - buy_sum_asset) / actual_sum_asset) * 100,2)} % \n")
+    return text
+
+
+def all_user_added_assets_to_str(data):
+    text = ''
+    for row in data:
+        text += f"{row[0]}. {row[3]} {row[1]} по цене {row[2]} USD\n"
+    return text
+
+
+def user_chosen_asset_for_edit(data):
+    text = f"{data[0]}. {data[3]} {data[1]} по цене {data[2]} USD\n"
     return text
 
 
@@ -207,13 +278,11 @@ async def start_command(message: types.Message):
 async def info_command(message: types.Message):
     await message.answer("Info: \n "
                          "/checkCurrency - узнать стоимость криптоактива\n"
-                         "Работа с портфелем:\n"
+                         "Работа с портфелем:\n "
                          "/checkPortfolio - просмотреть текущий портфель\n"
                          "/addCurrency - добавить новый актив\n"
                          "/deleteCurrency - удалить актив\n"
-                         "/editCurrency - редактировать актив\n"
-                         "Настройка уведомлений\n"
-                         "/notifications - настроить уведомления"
+                         "/editCurrency - редактировать актив"
                          )
 
 
@@ -303,11 +372,12 @@ async def add_command(message: types.Message, state: FSMContext):
         added_asset = user.last_added_asset()
         await bot.send_message(message.chat.id,
                                'Вы добавили ' + str(added_asset[2]) + ' ' + str(added_asset[0])
-                               + ' на общую стоимость ' + str(added_asset[2] * added_asset[1])
+                               + ' на общую стоимость ' + str(round(added_asset[2] * added_asset[1], 2))
                                + ' $ в портфель! \n'
                                  '/checkPortfolio посмотреть свой текущий портфель\n'
                                  '/addCurrency добавить еще один актив в портфель\n'
-                                 '/deleteCurrency удалить актив из портфеля')
+                                 '/deleteCurrency удалить актив из портфеля\n'
+                                 '/editCurrency изменить добавленный актив')
         await state.finish()
     except ValueError:
         await bot.send_message(message.chat.id, 'Введите количество актива числом. Пример  = "1.01"\n'
@@ -357,6 +427,95 @@ async def check_command(message: types.Message, state: FSMContext):
             await bot.send_message(message.chat.id, f"Актив {asset.get('chosen_asset')} удален из вашего портфеля!\n"
                                                     f"/checkPortfolio")
             await state.finish()
+
+
+@dp.message_handler(commands=['editCurrency'])
+async def check_command(message: types.Message, state: FSMContext):
+    user = User(message.from_user.id)
+    data = user.check_all_user_assets()
+    if len(data) == 0:
+        await bot.send_message(message.chat.id, 'Редактировать нечего, Ваш портфель пуст!\n'
+                                                '/addCurrency для добавления актива')
+    else:
+        text = all_user_added_assets_to_str(data)
+        await bot.send_message(message.chat.id, 'Ваши добавленные активы:\n' + text)
+        await bot.send_message(message.chat.id, 'Введите номер строки из представленных для редактирования')
+        await state.set_state(AssetStates.asset_id_for_edit.state)
+        await state.update_data(user_asset_data=data)
+
+
+@dp.message_handler(state=AssetStates.asset_id_for_edit)
+async def check_command(message: types.Message, state: FSMContext):
+    try:
+        await state.update_data(user_asset_id=int(message.text))
+        data = await state.get_data()
+        if len(data.get('user_asset_data')) < data.get('user_asset_id'):
+            await bot.send_message(message.chat.id, 'Такой строки не существует\n'
+                                                    '/editCurrency попробуйте снова')
+            await state.finish()
+        else:
+            output_text = user_chosen_asset_for_edit(data.get('user_asset_data')[data.get('user_asset_id') - 1])
+            await bot.send_message(message.chat.id, 'Вы выбрали:\n'
+                                   + output_text)
+            await bot.send_message(message.chat.id, 'Выберите, что необходимо изменить\n'
+                                                    '1 - количество, '
+                                                    '2 - цена покупки, '
+                                                    '3 - удалить запись')
+            await state.set_state(AssetStates.user_action_for_edit.state)
+    except ValueError:
+        await bot.send_message(message.chat.id, 'Введите номер выбранной записи целым числом. Пример  = "1"\n'
+                                                '/editCurrency попробуйте снова')
+        await state.finish()
+
+
+@dp.message_handler(state=AssetStates.user_action_for_edit)
+async def check_command(message: types.Message, state: FSMContext):
+    try:
+        user = User(message.from_user.id)
+        await state.update_data(user_action=int(message.text))
+        data = await state.get_data()
+        if data.get('user_action') not in [1, 2, 3]:
+            await bot.send_message(message.chat.id, 'Такое действие не предусмотрено, введите число от 1 до 3\n'
+                                                    '/editCurrency попробуйте снова')
+            await state.finish()
+        elif data.get('user_action') == 3:
+            chosen_row = data.get('user_asset_data')[data.get('user_asset_id') - 1][4]
+            user.delete_row_chosen_asset(chosen_row)
+            await bot.send_message(message.chat.id, 'Строка удалена!\n'
+                                                    '/checkPortfolio посмотреть свой текущий портфель')
+            await state.finish()
+        else:
+            await bot.send_message(message.chat.id, 'Введите необходимое значение')
+            await state.set_state(AssetStates.user_value_for_edit.state)
+    except ValueError:
+        await bot.send_message(message.chat.id, 'Введите номер выбранной записи целым числом. Пример  = "1"\n'
+                                                '/editCurrency попробуйте снова')
+        await state.finish()
+
+
+@dp.message_handler(state=AssetStates.user_value_for_edit)
+async def check_command(message: types.Message, state: FSMContext):
+    try:
+        await state.update_data(user_value=float(message.text))
+        user = User(message.from_user.id)
+        data = await state.get_data()
+        chosen_row = data.get('user_asset_data')[data.get('user_asset_id') - 1][4]
+        chosen_value = data.get('user_value')
+        if data.get('user_action') == 1:
+            user.update_supply_chosen_asset(chosen_row, chosen_value)
+            await bot.send_message(message.chat.id, 'Значение обновлено!\n'
+                                                    '/checkPortfolio посмотреть свой текущий портфель')
+            await state.finish()
+        else:
+            user.update_price_chosen_asset(chosen_row, chosen_value)
+            await bot.send_message(message.chat.id, 'Значение обновлено!\n'
+                                                    '/checkPortfolio посмотреть свой текущий портфель\n'
+                                                    '/addCurrency - добавить новый актив')
+            await state.finish()
+    except ValueError:
+        await bot.send_message(message.chat.id, 'Введите номер выбранной записи целым числом. Пример  = "1"\n'
+                                                '/editCurrency попробуйте снова')
+        await state.finish()
 
 
 if __name__ == '__main__':
