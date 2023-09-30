@@ -64,7 +64,7 @@ class UserTests(unittest.TestCase):
         asset = main.Asset('ASD', 100, 100, self.test_telegram_id_for_portfolio_check)
         asset.add_asset()
         result = user.check_portfolio()
-        self.assertEqual(result[0][0], float((asset.price * asset.supply)/asset.supply))
+        self.assertEqual(result[0][0], float((asset.price * asset.supply) / asset.supply))
         self.assertEqual(result[0][1], float(asset.supply))
         self.assertEqual(result[0][2], asset.ticker)
 
@@ -135,6 +135,37 @@ class LogicTests(unittest.TestCase):
         asset = 'BTC'
         check = main.get_asset_price(actual_data, asset)
         self.assertIsNotNone(check)
+
+    def test_user_chosen_asset_for_edit(self):
+        data = [1, 10, 25000, 'BTC']
+        check = main.user_chosen_asset_for_edit(data)
+        self.assertEqual(check, f"{data[0]}. {data[3]} {data[1]} по цене {data[2]} USD\n")
+
+    def test_all_user_added_assets_to_str(self):
+        text = ''
+        data = [[1, 10, 25000, 'BTC'], [2, 15, 1500, 'ETH']]
+        for row in data:
+            text += f"{row[0]}. {row[3]} {row[1]} по цене {row[2]} USD\n"
+        check_text = main.all_user_added_assets_to_str(data)
+        self.assertEqual(check_text, text)
+
+    def test_check_portfolio_text(self):
+        data = [[1000, 10, 'asd']]
+        actual_asset_prices = [100]
+        actual_sum = 0
+        buy_sum = []
+        for i in range(len(data)):
+            actual_sum += data[i][1] * actual_asset_prices[i]
+            buy_sum.append(data[i][1] * data[i][0])
+        text = (f"Ваш портфель: {round(actual_sum, 2)} $" +
+                f" / {round(((actual_sum - sum(buy_sum)) / sum(buy_sum))*100, 2)}% \n")
+        for i in range(len(data)):
+            actual_sum_asset = data[i][1] * actual_asset_prices[i]
+            buy_sum_asset = data[i][1] * data[i][0]
+            text += (
+                    f"{round(data[i][1], 2)} {data[i][2]} на сумму {round(actual_sum_asset)} "
+                    "USD / " + f"{round(((actual_sum_asset - buy_sum_asset) / actual_sum_asset) * 100,2)} % \n")
+        self.assertEqual(main.check_portfolio_text(data, actual_asset_prices), text)
 
 
 if __name__ == '__main__':
