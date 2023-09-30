@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 bot = Bot(os.getenv('BOT_TOKEN'))
-db_path = '\\app_data\\db.db'
+db_path = 'app\\app_data\\db.db'
 
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
